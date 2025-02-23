@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TPY Staking DApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    input, button, textarea, select { padding: 0.5rem; margin: 0.5rem 0; width: 100%; max-width: 400px; }
+    .section { border: 1px solid #ddd; padding: 1rem; margin-bottom: 2rem; }
+    .result { margin-top: 1rem; }
+    label { display: block; margin-top: 1rem; }
+    pre { background: #f8f8f8; padding: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>TPY Staking DApp</h1>
+  
+  <!-- Wallet Connection -->
+  <div class="section">
+    <h2>Wallet Connection</h2>
+    <button id="connectWalletButton">Connect Wallet</button>
+    <p><strong>Connected Address:</strong> <span id="walletAddress">Not connected</span></p>
+  </div>
+  
+  <!-- Contract Configuration -->
+  <div class="section">
+    <h2>Contract Configuration</h2>
+    <label for="contractAddress">TPY Staking Contract Address:</label>
+    <input type="text" id="contractAddress" value="0xYourContractAddress" />
+  </div>
+  
+  <!-- Stake Section -->
+  <div class="section">
+    <h2>Stake Tokens</h2>
+    <label for="stakePoolId">Pool ID:</label>
+    <input type="number" id="stakePoolId" value="0" />
+    
+    <label for="stakeAmount">Amount to Stake:</label>
+    <input type="text" id="stakeAmount" placeholder="Amount in smallest unit" />
+    
+    <label for="referrerId">Referrer ID (optional):</label>
+    <input type="number" id="referrerId" value="0" />
+    
+    <button id="stakeButton">Stake</button>
+    <div class="result">
+      <pre id="stakeResult">-</pre>
+    </div>
+  </div>
+  
+  <!-- Unstake Section -->
+  <div class="section">
+    <h2>Unstake Tokens</h2>
+    <label for="unstakePoolId">Pool ID:</label>
+    <input type="number" id="unstakePoolId" value="0" />
+    
+    <label for="unstakeAmount">Amount to Unstake:</label>
+    <input type="text" id="unstakeAmount" placeholder="Amount in smallest unit" />
+    
+    <button id="unstakeButton">Unstake</button>
+    <div class="result">
+      <pre id="unstakeResult">-</pre>
+    </div>
+  </div>
+  
+  <!-- Emergency Unstake Section -->
+  <div class="section">
+    <h2>Emergency Unstake</h2>
+    <label for="emergencyPoolId">Pool ID:</label>
+    <input type="number" id="emergencyPoolId" value="0" />
+    
+    <button id="emergencyUnstakeButton">Emergency Unstake</button>
+    <div class="result">
+      <pre id="emergencyResult">-</pre>
+    </div>
+  </div>
+  
+  <!-- Admin Functions Section -->
+  <div class="section">
+    <h2>Admin Functions</h2>
+    
+    <!-- Add Pool -->
+    <h3>Add Pool</h3>
+    <label for="addPoolApy">APY:</label>
+    <input type="number" id="addPoolApy" value="1000" />
+    
+    <label for="addPoolLockPeriod">Lock Period (seconds):</label>
+    <input type="number" id="addPoolLockPeriod" value="2592000" />
+    
+    <button id="addPoolButton">Add Pool</button>
+    <div class="result">
+      <pre id="addPoolResult">-</pre>
+    </div>
+    
+    <!-- Change Pool -->
+    <h3>Change Pool</h3>
+    <label for="changePoolId">Pool ID:</label>
+    <input type="number" id="changePoolId" value="0" />
+    
+    <label for="changePoolApy">New APY:</label>
+    <input type="number" id="changePoolApy" value="1000" />
+    
+    <label for="changePoolLockPeriod">New Lock Period (seconds):</label>
+    <input type="number" id="changePoolLockPeriod" value="2592000" />
+    
+    <button id="changePoolButton">Change Pool</button>
+    <div class="result">
+      <pre id="changePoolResult">-</pre>
+    </div>
+    
+    <!-- Pause Pool -->
+    <h3>Pause Pool</h3>
+    <label for="pausePoolId">Pool ID:</label>
+    <input type="number" id="pausePoolId" value="0" />
+    
+    <button id="pausePoolButton">Pause Pool</button>
+    <div class="result">
+      <pre id="pausePoolResult">-</pre>
+    </div>
+    
+    <!-- Set Referrer Reward -->
+    <h3>Set Referrer Reward</h3>
+    <label for="setReward">New Referrer Reward (%):</label>
+    <input type="number" id="setReward" value="20" />
+    
+    <button id="setRewardButton">Set Referrer Reward</button>
+    <div class="result">
+      <pre id="setRewardResult">-</pre>
+    </div>
+    
+    <!-- Set Treasury Address -->
+    <h3>Set Treasury Address</h3>
+    <label for="setTreasuryAddress">New Treasury Address:</label>
+    <input type="text" id="setTreasuryAddress" placeholder="0x..." />
+    
+    <button id="setTreasuryButton">Set Treasury</button>
+    <div class="result">
+      <pre id="setTreasuryResult">-</pre>
+    </div>
+    
+    <!-- Rescue Tokens -->
+    <h3>Rescue Tokens</h3>
+    <label for="rescueToken">Token Address:</label>
+    <input type="text" id="rescueToken" placeholder="0x..." />
+    
+    <label for="rescueAmount">Amount:</label>
+    <input type="text" id="rescueAmount" placeholder="Amount in smallest unit" />
+    
+    <button id="rescueTokensButton">Rescue Tokens</button>
+    <div class="result">
+      <pre id="rescueTokensResult">-</pre>
+    </div>
+  </div>
+  
+  <script>
+    // Ethers.js and UI logic
+    let signer;
+    let contract;
+    const tpyStakingABI = [
+      // Minimal ABI for the TPYStaking functions
+      "function stake(uint256 pid_, uint256 amount_, uint256 referrerId_) external",
+      "function unstake(uint256 pid_, uint256 amount_) external",
+      "function emergencyUnstake(uint256 pid_) external",
+      "function addPool(uint256 apy_, uint256 lockPeriod_) external",
+      "function changePool(uint256 pid_, uint256 newApy_, uint256 newLockPeriod_) external",
+      "function pausePool(uint256 pid_) external",
+      "function setReferrerReward(uint256 newReferrerReward_) external",
+      "function setTreasuryAddress(address newTreasury_) external",
+      "function inCaseTokensGetStuck(address token_, uint256 amount_) external"
+    ];
+    
+    // Connect wallet and instantiate contract with signer
+    async function connectWallet() {
+      if (window.ethereum) {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        document.getElementById('walletAddress').innerText = await signer.getAddress();
+        const contractAddress = document.getElementById('contractAddress').value.trim();
+        contract = new ethers.Contract(contractAddress, tpyStakingABI, signer);
+      } else {
+        alert("Please install a Web3 wallet like MetaMask.");
+      }
+    }
+    
+    document.getElementById('connectWalletButton').addEventListener('click', connectWallet);
+    
+    // Stake tokens
+    document.getElementById('stakeButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('stakePoolId').value;
+      const amount = document.getElementById('stakeAmount').value;
+      const referrerId = document.getElementById('referrerId').value;
+      try {
+        const tx = await contract.stake(poolId, amount, referrerId);
+        document.getElementById('stakeResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('stakeResult').innerText = "Stake successful: " + tx.hash;
+      } catch (error) {
+        document.getElementById('stakeResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Unstake tokens
+    document.getElementById('unstakeButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('unstakePoolId').value;
+      const amount = document.getElementById('unstakeAmount').value;
+      try {
+        const tx = await contract.unstake(poolId, amount);
+        document.getElementById('unstakeResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('unstakeResult').innerText = "Unstake successful: " + tx.hash;
+      } catch (error) {
+        document.getElementById('unstakeResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Emergency unstake
+    document.getElementById('emergencyUnstakeButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('emergencyPoolId').value;
+      try {
+        const tx = await contract.emergencyUnstake(poolId);
+        document.getElementById('emergencyResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('emergencyResult').innerText = "Emergency unstake successful: " + tx.hash;
+      } catch (error) {
+        document.getElementById('emergencyResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Admin function: Add Pool
+    document.getElementById('addPoolButton').addEventListener('click', async () => {
+      const apy = document.getElementById('addPoolApy').value;
+      const lockPeriod = document.getElementById('addPoolLockPeriod').value;
+      try {
+        const tx = await contract.addPool(apy, lockPeriod);
+        document.getElementById('addPoolResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('addPoolResult').innerText = "Pool added: " + tx.hash;
+      } catch (error) {
+        document.getElementById('addPoolResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Admin function: Change Pool
+    document.getElementById('changePoolButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('changePoolId').value;
+      const newApy = document.getElementById('changePoolApy').value;
+      const newLockPeriod = document.getElementById('changePoolLockPeriod').value;
+      try {
+        const tx = await contract.changePool(poolId, newApy, newLockPeriod);
+        document.getElementById('changePoolResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('changePoolResult').innerText = "Pool changed: " + tx.hash;
+      } catch (error) {
+        document.getElementById('changePoolResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Admin function: Pause Pool
+    document.getElementById('pausePoolButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('pausePoolId').value;
+      try {
+        const tx = await contract.pausePool(poolId);
+        document.getElementById('pausePoolResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('pausePoolResult').innerText = "Pool paused: " + tx.hash;
+      } catch (error) {
+        document.getElementById('pausePoolResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Admin function: Set Referrer Reward
+    document.getElementById('setRewardButton').addEventListener('click', async () => {
+      const reward = document.getElementById('setReward').value;
+      try {
+        const tx = await contract.setReferrerReward(reward);
+        document.getElementById('setRewardResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('setRewardResult').innerText = "Referrer reward set: " + tx.hash;
+      } catch (error) {
+        document.getElementById('setRewardResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Admin function: Set Treasury Address
+    document.getElementById('setTreasuryButton').addEventListener('click', async () => {
+      const newTreasury = document.getElementById('setTreasuryAddress').value;
+      try {
+        const tx = await contract.setTreasuryAddress(newTreasury);
+        document.getElementById('setTreasuryResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('setTreasuryResult').innerText = "Treasury set: " + tx.hash;
+      } catch (error) {
+        document.getElementById('setTreasuryResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Admin function: Rescue Tokens
+    document.getElementById('rescueTokensButton').addEventListener('click', async () => {
+      const tokenAddress = document.getElementById('rescueToken').value;
+      const amount = document.getElementById('rescueAmount').value;
+      try {
+        const tx = await contract.inCaseTokensGetStuck(tokenAddress, amount);
+        document.getElementById('rescueTokensResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('rescueTokensResult').innerText = "Tokens rescued: " + tx.hash;
+      } catch (error) {
+        document.getElementById('rescueTokensResult').innerText = "Error: " + error.message;
+      }
+    });
+  </script>
+</body>
+</html>
