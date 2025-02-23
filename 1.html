@@ -30,9 +30,12 @@
     <input type="text" id="contractAddress" value="0xYourContractAddress" />
   </div>
   
-  <!-- Stake Section -->
+  <!-- Write Functions Section -->
   <div class="section">
-    <h2>Stake Tokens</h2>
+    <h2>Write Functions</h2>
+    
+    <!-- Stake Section -->
+    <h3>Stake Tokens</h3>
     <label for="stakePoolId">Pool ID:</label>
     <input type="number" id="stakePoolId" value="0" />
     
@@ -46,11 +49,9 @@
     <div class="result">
       <pre id="stakeResult">-</pre>
     </div>
-  </div>
-  
-  <!-- Unstake Section -->
-  <div class="section">
-    <h2>Unstake Tokens</h2>
+    
+    <!-- Unstake Section -->
+    <h3>Unstake Tokens</h3>
     <label for="unstakePoolId">Pool ID:</label>
     <input type="number" id="unstakePoolId" value="0" />
     
@@ -61,11 +62,9 @@
     <div class="result">
       <pre id="unstakeResult">-</pre>
     </div>
-  </div>
-  
-  <!-- Emergency Unstake Section -->
-  <div class="section">
-    <h2>Emergency Unstake</h2>
+    
+    <!-- Emergency Unstake Section -->
+    <h3>Emergency Unstake</h3>
     <label for="emergencyPoolId">Pool ID:</label>
     <input type="number" id="emergencyPoolId" value="0" />
     
@@ -73,14 +72,11 @@
     <div class="result">
       <pre id="emergencyResult">-</pre>
     </div>
-  </div>
-  
-  <!-- Admin Functions Section -->
-  <div class="section">
-    <h2>Admin Functions</h2>
     
+    <!-- Admin Functions -->
+    <h3>Admin Functions</h3>
     <!-- Add Pool -->
-    <h3>Add Pool</h3>
+    <h4>Add Pool</h4>
     <label for="addPoolApy">APY:</label>
     <input type="number" id="addPoolApy" value="1000" />
     
@@ -93,7 +89,7 @@
     </div>
     
     <!-- Change Pool -->
-    <h3>Change Pool</h3>
+    <h4>Change Pool</h4>
     <label for="changePoolId">Pool ID:</label>
     <input type="number" id="changePoolId" value="0" />
     
@@ -109,7 +105,7 @@
     </div>
     
     <!-- Pause Pool -->
-    <h3>Pause Pool</h3>
+    <h4>Pause Pool</h4>
     <label for="pausePoolId">Pool ID:</label>
     <input type="number" id="pausePoolId" value="0" />
     
@@ -119,7 +115,7 @@
     </div>
     
     <!-- Set Referrer Reward -->
-    <h3>Set Referrer Reward</h3>
+    <h4>Set Referrer Reward</h4>
     <label for="setReward">New Referrer Reward (%):</label>
     <input type="number" id="setReward" value="20" />
     
@@ -129,7 +125,7 @@
     </div>
     
     <!-- Set Treasury Address -->
-    <h3>Set Treasury Address</h3>
+    <h4>Set Treasury Address</h4>
     <label for="setTreasuryAddress">New Treasury Address:</label>
     <input type="text" id="setTreasuryAddress" placeholder="0x..." />
     
@@ -139,7 +135,7 @@
     </div>
     
     <!-- Rescue Tokens -->
-    <h3>Rescue Tokens</h3>
+    <h4>Rescue Tokens</h4>
     <label for="rescueToken">Token Address:</label>
     <input type="text" id="rescueToken" placeholder="0x..." />
     
@@ -152,12 +148,45 @@
     </div>
   </div>
   
+  <!-- Read Functions Section -->
+  <div class="section">
+    <h2>Read Contract Data</h2>
+    
+    <!-- Total Stakes -->
+    <button id="readTotalStakesButton">Get Total Stakes</button>
+    <div class="result">
+      <pre id="readTotalStakesResult">-</pre>
+    </div>
+    
+    <!-- Pool Info -->
+    <label for="poolIdRead">Pool ID for Pool Info:</label>
+    <input type="number" id="poolIdRead" value="0" />
+    <button id="readPoolInfoButton">Get Pool Info</button>
+    <div class="result">
+      <pre id="readPoolInfoResult">-</pre>
+    </div>
+    
+    <!-- User Stake Info -->
+    <label for="stakeInfoPoolId">Pool ID for Your Stake Info:</label>
+    <input type="number" id="stakeInfoPoolId" value="0" />
+    <button id="readUserStakeInfoButton">Get My Stake Info</button>
+    <div class="result">
+      <pre id="readUserStakeInfoResult">-</pre>
+    </div>
+    
+    <!-- User Referrer -->
+    <button id="readUserReferrerButton">Get My Referrer</button>
+    <div class="result">
+      <pre id="readUserReferrerResult">-</pre>
+    </div>
+  </div>
+  
   <script>
     // Ethers.js and UI logic
     let signer;
     let contract;
     const tpyStakingABI = [
-      // Minimal ABI for the TPYStaking functions
+      // Minimal ABI for both write and read functions
       "function stake(uint256 pid_, uint256 amount_, uint256 referrerId_) external",
       "function unstake(uint256 pid_, uint256 amount_) external",
       "function emergencyUnstake(uint256 pid_) external",
@@ -166,7 +195,11 @@
       "function pausePool(uint256 pid_) external",
       "function setReferrerReward(uint256 newReferrerReward_) external",
       "function setTreasuryAddress(address newTreasury_) external",
-      "function inCaseTokensGetStuck(address token_, uint256 amount_) external"
+      "function inCaseTokensGetStuck(address token_, uint256 amount_) external",
+      "function totalStakes() view returns (uint256)",
+      "function poolInfo(uint256) view returns (bool isPaused, uint256 lockPeriod, uint256 apy, uint256 totalStakes, uint256 pauseCheckpoint)",
+      "function stakeOfAuto(uint256, address) view returns (uint256)",
+      "function userReferrer(address) view returns (address)"
     ];
     
     // Connect wallet and instantiate contract with signer
@@ -185,7 +218,7 @@
     
     document.getElementById('connectWalletButton').addEventListener('click', connectWallet);
     
-    // Stake tokens
+    // Write functions
     document.getElementById('stakeButton').addEventListener('click', async () => {
       const poolId = document.getElementById('stakePoolId').value;
       const amount = document.getElementById('stakeAmount').value;
@@ -200,7 +233,6 @@
       }
     });
     
-    // Unstake tokens
     document.getElementById('unstakeButton').addEventListener('click', async () => {
       const poolId = document.getElementById('unstakePoolId').value;
       const amount = document.getElementById('unstakeAmount').value;
@@ -214,7 +246,6 @@
       }
     });
     
-    // Emergency unstake
     document.getElementById('emergencyUnstakeButton').addEventListener('click', async () => {
       const poolId = document.getElementById('emergencyPoolId').value;
       try {
@@ -227,7 +258,6 @@
       }
     });
     
-    // Admin function: Add Pool
     document.getElementById('addPoolButton').addEventListener('click', async () => {
       const apy = document.getElementById('addPoolApy').value;
       const lockPeriod = document.getElementById('addPoolLockPeriod').value;
@@ -241,7 +271,6 @@
       }
     });
     
-    // Admin function: Change Pool
     document.getElementById('changePoolButton').addEventListener('click', async () => {
       const poolId = document.getElementById('changePoolId').value;
       const newApy = document.getElementById('changePoolApy').value;
@@ -256,7 +285,6 @@
       }
     });
     
-    // Admin function: Pause Pool
     document.getElementById('pausePoolButton').addEventListener('click', async () => {
       const poolId = document.getElementById('pausePoolId').value;
       try {
@@ -269,7 +297,6 @@
       }
     });
     
-    // Admin function: Set Referrer Reward
     document.getElementById('setRewardButton').addEventListener('click', async () => {
       const reward = document.getElementById('setReward').value;
       try {
@@ -282,7 +309,6 @@
       }
     });
     
-    // Admin function: Set Treasury Address
     document.getElementById('setTreasuryButton').addEventListener('click', async () => {
       const newTreasury = document.getElementById('setTreasuryAddress').value;
       try {
@@ -295,7 +321,6 @@
       }
     });
     
-    // Admin function: Rescue Tokens
     document.getElementById('rescueTokensButton').addEventListener('click', async () => {
       const tokenAddress = document.getElementById('rescueToken').value;
       const amount = document.getElementById('rescueAmount').value;
@@ -306,6 +331,48 @@
         document.getElementById('rescueTokensResult').innerText = "Tokens rescued: " + tx.hash;
       } catch (error) {
         document.getElementById('rescueTokensResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Read functions
+    document.getElementById('readTotalStakesButton').addEventListener('click', async () => {
+      try {
+        const totalStakes = await contract.totalStakes();
+        document.getElementById('readTotalStakesResult').innerText = "Total Stakes: " + totalStakes.toString();
+      } catch (error) {
+        document.getElementById('readTotalStakesResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    document.getElementById('readPoolInfoButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('poolIdRead').value;
+      try {
+        const info = await contract.poolInfo(poolId);
+        // info is a tuple with keys: isPaused, lockPeriod, apy, totalStakes, pauseCheckpoint.
+        document.getElementById('readPoolInfoResult').innerText = "Pool Info:\n" + JSON.stringify(info, null, 2);
+      } catch (error) {
+        document.getElementById('readPoolInfoResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    document.getElementById('readUserStakeInfoButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('stakeInfoPoolId').value;
+      try {
+        const userAddress = await signer.getAddress();
+        const stakeInfo = await contract.stakeOfAuto(poolId, userAddress);
+        document.getElementById('readUserStakeInfoResult').innerText = "Your Stake (including rewards): " + stakeInfo.toString();
+      } catch (error) {
+        document.getElementById('readUserStakeInfoResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    document.getElementById('readUserReferrerButton').addEventListener('click', async () => {
+      try {
+        const userAddress = await signer.getAddress();
+        const referrer = await contract.userReferrer(userAddress);
+        document.getElementById('readUserReferrerResult').innerText = "Your Referrer: " + referrer;
+      } catch (error) {
+        document.getElementById('readUserReferrerResult').innerText = "Error: " + error.message;
       }
     });
   </script>
