@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>TPY Staking DApp</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
@@ -13,21 +13,22 @@
     pre { background: #f8f8f8; padding: 0.5rem; }
     /* Styling for available pools and admin section */
     .admin-section { background-color: #fff8f8; }
-    .pool-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 1rem;
-      margin: 1rem 0;
-    }
+    .pool-grid { display: block; margin: 1rem 0; }
     .pool-card {
       border: 1px solid #ddd;
       padding: 1rem;
       border-radius: 4px;
       background: #f8f8f8;
+      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
     }
-    .pool-card.paused {
-      background: #fff0f0;
-    }
+    .pool-card.paused { background: #fff0f0; }
+    .pool-info { flex: 1; }
+    .pool-actions { flex: 0 0 auto; margin-left: 1rem; }
+    .pool-actions input { width: auto; margin-right: 0.5rem; }
     .refresh-button {
       background: #4CAF50;
       color: white;
@@ -36,13 +37,11 @@
       cursor: pointer;
       border-radius: 4px;
     }
-    .refresh-button:hover {
-      background: #45a049;
-    }
+    .refresh-button:hover { background: #45a049; }
   </style>
 </head>
 <body>
-  <!-- New Available Pools Section -->
+  <!-- Available Pools Section -->
   <h1>TPY Staking DApp</h1>
   <div class="section">
     <h2>Available Pools</h2>
@@ -59,20 +58,17 @@
     <p><strong>Connected Address:</strong> <span id="walletAddress">Not connected</span></p>
   </div>
   
-  <!-- Write Functions Section -->
+  <!-- Write Functions Section (Global) -->
   <div class="section">
     <h2>Write Functions</h2>
     <!-- Stake Section -->
     <h3>Stake Tokens</h3>
     <label for="stakePoolId">Pool ID:</label>
     <input type="number" id="stakePoolId" value="0" />
-    
     <label for="stakeAmount">Amount to Stake:</label>
     <input type="text" id="stakeAmount" placeholder="Amount in smallest unit" />
-    
     <label for="referrerId">Referrer ID (optional):</label>
     <input type="number" id="referrerId" value="0" />
-    
     <button id="stakeButton">Stake</button>
     <div class="result">
       <pre id="stakeResult">-</pre>
@@ -82,10 +78,8 @@
     <h3>Unstake Tokens</h3>
     <label for="unstakePoolId">Pool ID:</label>
     <input type="number" id="unstakePoolId" value="0" />
-    
     <label for="unstakeAmount">Amount to Unstake:</label>
     <input type="text" id="unstakeAmount" placeholder="Amount in smallest unit" />
-    
     <button id="unstakeButton">Unstake</button>
     <div class="result">
       <pre id="unstakeResult">-</pre>
@@ -95,7 +89,6 @@
     <h3>Emergency Unstake</h3>
     <label for="emergencyPoolId">Pool ID:</label>
     <input type="number" id="emergencyPoolId" value="0" />
-    
     <button id="emergencyUnstakeButton">Emergency Unstake</button>
     <div class="result">
       <pre id="emergencyResult">-</pre>
@@ -105,30 +98,22 @@
   <!-- Read Functions Section -->
   <div class="section">
     <h2>Read Contract Data</h2>
-    
-    <!-- Total Stakes -->
     <button id="readTotalStakesButton">Get Total Stakes</button>
     <div class="result">
       <pre id="readTotalStakesResult">-</pre>
     </div>
-    
-    <!-- Pool Info -->
     <label for="poolIdRead">Pool ID for Pool Info:</label>
     <input type="number" id="poolIdRead" value="0" />
     <button id="readPoolInfoButton">Get Pool Info</button>
     <div class="result">
       <pre id="readPoolInfoResult">-</pre>
     </div>
-    
-    <!-- User Stake Info -->
     <label for="stakeInfoPoolId">Pool ID for Your Stake Info:</label>
     <input type="number" id="stakeInfoPoolId" value="0" />
     <button id="readUserStakeInfoButton">Get My Stake Info</button>
     <div class="result">
       <pre id="readUserStakeInfoResult">-</pre>
     </div>
-    
-    <!-- User Referrer -->
     <button id="readUserReferrerButton">Get My Referrer</button>
     <div class="result">
       <pre id="readUserReferrerResult">-</pre>
@@ -140,9 +125,18 @@
     const CONTRACT_ADDRESS = "0xBbB449a875bAD0bc422758F0E08e86202E500eD3";
     const RPC_ENDPOINT = "https://rpc.sepolia.org";
     
+    // Global wallet variables for write functions
     let signer;
     let contract;
-    // Combined ABI including poolLength and hasRole for the additional functionality
+    
+    // Create a public provider and read-only contract instance for pool info
+    const publicProvider = new ethers.providers.JsonRpcProvider(RPC_ENDPOINT);
+    const publicContract = new ethers.Contract(CONTRACT_ADDRESS, [
+      "function poolInfo(uint256) view returns (bool isPaused, uint256 lockPeriod, uint256 apy, uint256 totalStakes, uint256 pauseCheckpoint)",
+      "function poolLength() view returns (uint256)"
+    ], publicProvider);
+    
+    // Combined ABI for write functions and other reads (same as before)
     const tpyStakingABI = [
       "function stake(uint256 pid_, uint256 amount_, uint256 referrerId_) external",
       "function unstake(uint256 pid_, uint256 amount_) external",
@@ -151,7 +145,6 @@
       "function poolInfo(uint256) view returns (bool isPaused, uint256 lockPeriod, uint256 apy, uint256 totalStakes, uint256 pauseCheckpoint)",
       "function stakeOfAuto(uint256, address) view returns (uint256)",
       "function userReferrer(address) view returns (address)",
-      "function poolLength() view returns (uint256)",
       "function hasRole(bytes32, address) view returns (bool)"
     ];
     
@@ -166,51 +159,52 @@
       if (minutes > 0) result.push(`${minutes} minutes`);
       return result.join(', ') || 'less than a minute';
     }
-    
     function formatAPY(apy) {
       return (apy / 100).toFixed(2) + '%';
     }
-    
     function formatTokens(amount) {
       return ethers.utils.formatEther(amount);
     }
     
-    // Updated refreshPools: try using poolLength() first and catch errors for each pool info call
+    // Refresh pool list using the public read-only contract instance
     async function refreshPools() {
-      if (!contract) {
-        document.getElementById('poolList').innerHTML = '<p>Please connect your wallet first</p>';
-        return;
-      }
       try {
         let poolCount = 0;
-        // Try to use poolLength() if available
         try {
-          poolCount = await contract.poolLength();
+          poolCount = await publicContract.poolLength();
           poolCount = poolCount.toNumber();
         } catch (err) {
-          // Fallback: determine pool count by iterating until error
+          // Fallback: iterate until an error is thrown
           while (true) {
             try {
-              await contract.poolInfo(poolCount);
+              await publicContract.poolInfo(poolCount);
               poolCount++;
             } catch (error) {
               break;
             }
           }
         }
-        
         let poolsHtml = '';
         for (let i = 0; i < poolCount; i++) {
           try {
-            const pool = await contract.poolInfo(i);
+            const pool = await publicContract.poolInfo(i);
             poolsHtml += `
-              <div class="pool-card ${pool.isPaused ? 'paused' : ''}">
-                <h3>Pool #${i}</h3>
-                <p><strong>Status:</strong> ${pool.isPaused ? '🔴 Paused' : '🟢 Active'}</p>
-                <p><strong>APY:</strong> ${formatAPY(pool.apy)}</p>
-                <p><strong>Lock Period:</strong> ${formatDuration(pool.lockPeriod.toNumber())}</p>
-                <p><strong>Total Staked:</strong> ${formatTokens(pool.totalStakes)} TPY</p>
-                ${pool.isPaused ? `<p><strong>Paused At:</strong> ${new Date(pool.pauseCheckpoint.toNumber() * 1000).toLocaleString()}</p>` : ''}
+              <div class="pool-card ${pool.isPaused ? 'paused' : ''}" data-poolid="${i}">
+                <div class="pool-info">
+                  <h3>Pool #${i}</h3>
+                  <p><strong>Status:</strong> ${pool.isPaused ? '🔴 Paused' : '🟢 Active'}</p>
+                  <p><strong>APY:</strong> ${formatAPY(pool.apy)}</p>
+                  <p><strong>Lock Period:</strong> ${formatDuration(pool.lockPeriod.toNumber())}</p>
+                  <p><strong>Total Staked:</strong> ${formatTokens(pool.totalStakes)} TPY</p>
+                  ${pool.isPaused ? `<p><strong>Paused At:</strong> ${new Date(pool.pauseCheckpoint.toNumber() * 1000).toLocaleString()}</p>` : ''}
+                </div>
+                <div class="pool-actions">
+                  <input type="text" class="stakeAmount" placeholder="Amount to Stake" data-poolid="${i}">
+                  <button class="poolStakeButton" data-poolid="${i}">Stake</button>
+                  <input type="text" class="unstakeAmount" placeholder="Amount to Unstake" data-poolid="${i}">
+                  <button class="poolUnstakeButton" data-poolid="${i}">Unstake</button>
+                  <div class="poolActionResult" data-poolid="${i}"></div>
+                </div>
               </div>
             `;
           } catch (innerError) {
@@ -218,13 +212,61 @@
           }
         }
         document.getElementById('poolList').innerHTML = poolsHtml || '<p>No pools available</p>';
+        attachPoolActionListeners();
       } catch (error) {
         console.error('Error fetching pools:', error);
         document.getElementById('poolList').innerHTML = '<p>Error loading pools: ' + error.message + '</p>';
       }
     }
     
-    // Connect wallet and instantiate contract; refresh pools after connecting
+    // Attach event listeners for the stake/unstake buttons inside each pool card
+    function attachPoolActionListeners() {
+      document.querySelectorAll('.poolStakeButton').forEach(button => {
+        button.addEventListener('click', async function() {
+          const poolId = this.dataset.poolid;
+          const card = this.closest('.pool-card');
+          const amountInput = card.querySelector('.stakeAmount');
+          const amount = amountInput.value;
+          const resultDiv = card.querySelector('.poolActionResult');
+          if (!contract) {
+            alert('Please connect your wallet first to perform staking.');
+            return;
+          }
+          try {
+            // Here referrerId is set to 0; modify as needed
+            const tx = await contract.stake(poolId, amount, 0);
+            resultDiv.innerText = "Transaction sent: " + tx.hash;
+            await tx.wait();
+            resultDiv.innerText = "Stake successful: " + tx.hash;
+          } catch (error) {
+            resultDiv.innerText = "Error: " + error.message;
+          }
+        });
+      });
+      document.querySelectorAll('.poolUnstakeButton').forEach(button => {
+        button.addEventListener('click', async function() {
+          const poolId = this.dataset.poolid;
+          const card = this.closest('.pool-card');
+          const amountInput = card.querySelector('.unstakeAmount');
+          const amount = amountInput.value;
+          const resultDiv = card.querySelector('.poolActionResult');
+          if (!contract) {
+            alert('Please connect your wallet first to perform unstaking.');
+            return;
+          }
+          try {
+            const tx = await contract.unstake(poolId, amount);
+            resultDiv.innerText = "Transaction sent: " + tx.hash;
+            await tx.wait();
+            resultDiv.innerText = "Unstake successful: " + tx.hash;
+          } catch (error) {
+            resultDiv.innerText = "Error: " + error.message;
+          }
+        });
+      });
+    }
+    
+    // Connect wallet and instantiate the write contract using the wallet's signer
     async function connectWallet() {
       if (window.ethereum) {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -232,31 +274,12 @@
         signer = provider.getSigner();
         const userAddress = await signer.getAddress();
         document.getElementById('walletAddress').innerText = userAddress;
-        
-        // Check network is Sepolia (chainId 11155111)
         const network = await provider.getNetwork();
         if (network.chainId !== 11155111) {
           alert("Please switch to Sepolia network");
           return;
         }
-        
-        // Instantiate the contract
         contract = new ethers.Contract(CONTRACT_ADDRESS, tpyStakingABI, signer);
-        
-        // Refresh available pools after connecting
-        await refreshPools();
-        
-        // Check admin role (if admin section exists) and show/hide accordingly
-        const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000';
-        try {
-          const isAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, userAddress);
-          const adminSection = document.querySelector('.admin-section');
-          if (adminSection) {
-            adminSection.style.display = isAdmin ? 'block' : 'none';
-          }
-        } catch (err) {
-          console.error("Admin role check error:", err);
-        }
       } else {
         alert("Please install a Web3 wallet like MetaMask.");
       }
@@ -266,7 +289,7 @@
     document.getElementById('connectWalletButton').addEventListener('click', connectWallet);
     document.getElementById('refreshPoolsButton').addEventListener('click', refreshPools);
     
-    // Write functions
+    // Global write functions (for the separate write section)
     document.getElementById('stakeButton').addEventListener('click', async () => {
       const poolId = document.getElementById('stakePoolId').value;
       const amount = document.getElementById('stakeAmount').value;
@@ -280,7 +303,6 @@
         document.getElementById('stakeResult').innerText = "Error: " + error.message;
       }
     });
-    
     document.getElementById('unstakeButton').addEventListener('click', async () => {
       const poolId = document.getElementById('unstakePoolId').value;
       const amount = document.getElementById('unstakeAmount').value;
@@ -293,7 +315,6 @@
         document.getElementById('unstakeResult').innerText = "Error: " + error.message;
       }
     });
-    
     document.getElementById('emergencyUnstakeButton').addEventListener('click', async () => {
       const poolId = document.getElementById('emergencyPoolId').value;
       try {
@@ -315,7 +336,6 @@
         document.getElementById('readTotalStakesResult').innerText = "Error: " + error.message;
       }
     });
-    
     document.getElementById('readPoolInfoButton').addEventListener('click', async () => {
       const poolId = document.getElementById('poolIdRead').value;
       try {
@@ -325,7 +345,6 @@
         document.getElementById('readPoolInfoResult').innerText = "Error: " + error.message;
       }
     });
-    
     document.getElementById('readUserStakeInfoButton').addEventListener('click', async () => {
       const poolId = document.getElementById('stakeInfoPoolId').value;
       try {
@@ -336,7 +355,6 @@
         document.getElementById('readUserStakeInfoResult').innerText = "Error: " + error.message;
       }
     });
-    
     document.getElementById('readUserReferrerButton').addEventListener('click', async () => {
       try {
         const userAddress = await signer.getAddress();
@@ -346,6 +364,9 @@
         document.getElementById('readUserReferrerResult').innerText = "Error: " + error.message;
       }
     });
+    
+    // Automatically refresh pools on page load (read-only display)
+    refreshPools();
   </script>
 </body>
 </html>
