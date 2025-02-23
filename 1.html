@@ -11,7 +11,7 @@
     .result { margin-top: 1rem; }
     label { display: block; margin-top: 1rem; }
     pre { background: #f8f8f8; padding: 0.5rem; }
-    /* Added styling for available pools and admin section */
+    /* Styling for available pools and admin section */
     .admin-section { background-color: #fff8f8; }
     .pool-grid {
       display: grid;
@@ -142,7 +142,7 @@
     
     let signer;
     let contract;
-    // Combined ABI (including poolLength and hasRole for added functionality)
+    // Combined ABI including poolLength and hasRole for the additional functionality
     const tpyStakingABI = [
       "function stake(uint256 pid_, uint256 amount_, uint256 referrerId_) external",
       "function unstake(uint256 pid_, uint256 amount_) external",
@@ -175,37 +175,47 @@
       return ethers.utils.formatEther(amount);
     }
     
-    // Function to refresh the Available Pools list
+    // Updated refreshPools: try using poolLength() first and catch errors for each pool info call
     async function refreshPools() {
       if (!contract) {
         document.getElementById('poolList').innerHTML = '<p>Please connect your wallet first</p>';
         return;
       }
       try {
-        // Use a loop to determine pool count if poolLength() is not available
         let poolCount = 0;
-        while (true) {
-          try {
-            await contract.poolInfo(poolCount);
-            poolCount++;
-          } catch (error) {
-            break;
+        // Try to use poolLength() if available
+        try {
+          poolCount = await contract.poolLength();
+          poolCount = poolCount.toNumber();
+        } catch (err) {
+          // Fallback: determine pool count by iterating until error
+          while (true) {
+            try {
+              await contract.poolInfo(poolCount);
+              poolCount++;
+            } catch (error) {
+              break;
+            }
           }
         }
         
         let poolsHtml = '';
         for (let i = 0; i < poolCount; i++) {
-          const pool = await contract.poolInfo(i);
-          poolsHtml += `
-            <div class="pool-card ${pool.isPaused ? 'paused' : ''}">
-              <h3>Pool #${i}</h3>
-              <p><strong>Status:</strong> ${pool.isPaused ? '🔴 Paused' : '🟢 Active'}</p>
-              <p><strong>APY:</strong> ${formatAPY(pool.apy)}</p>
-              <p><strong>Lock Period:</strong> ${formatDuration(pool.lockPeriod.toNumber())}</p>
-              <p><strong>Total Staked:</strong> ${formatTokens(pool.totalStakes)} TPY</p>
-              ${pool.isPaused ? `<p><strong>Paused At:</strong> ${new Date(pool.pauseCheckpoint.toNumber() * 1000).toLocaleString()}</p>` : ''}
-            </div>
-          `;
+          try {
+            const pool = await contract.poolInfo(i);
+            poolsHtml += `
+              <div class="pool-card ${pool.isPaused ? 'paused' : ''}">
+                <h3>Pool #${i}</h3>
+                <p><strong>Status:</strong> ${pool.isPaused ? '🔴 Paused' : '🟢 Active'}</p>
+                <p><strong>APY:</strong> ${formatAPY(pool.apy)}</p>
+                <p><strong>Lock Period:</strong> ${formatDuration(pool.lockPeriod.toNumber())}</p>
+                <p><strong>Total Staked:</strong> ${formatTokens(pool.totalStakes)} TPY</p>
+                ${pool.isPaused ? `<p><strong>Paused At:</strong> ${new Date(pool.pauseCheckpoint.toNumber() * 1000).toLocaleString()}</p>` : ''}
+              </div>
+            `;
+          } catch (innerError) {
+            console.error("Error fetching pool index " + i + ":", innerError);
+          }
         }
         document.getElementById('poolList').innerHTML = poolsHtml || '<p>No pools available</p>';
       } catch (error) {
@@ -214,7 +224,7 @@
       }
     }
     
-    // Connect wallet and instantiate contract; also refresh available pools afterward
+    // Connect wallet and instantiate contract; refresh pools after connecting
     async function connectWallet() {
       if (window.ethereum) {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -233,10 +243,10 @@
         // Instantiate the contract
         contract = new ethers.Contract(CONTRACT_ADDRESS, tpyStakingABI, signer);
         
-        // Refresh the available pools list after connecting
+        // Refresh available pools after connecting
         await refreshPools();
         
-        // Check admin role (if an admin section exists) and show/hide accordingly
+        // Check admin role (if admin section exists) and show/hide accordingly
         const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000';
         try {
           const isAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, userAddress);
