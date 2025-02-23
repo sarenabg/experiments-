@@ -16,24 +16,30 @@
 <body>
   <h1>TPY Staking DApp</h1>
   
-  <!-- Wallet Connection -->
+  <!-- Wallet & Network Configuration -->
   <div class="section">
-    <h2>Wallet Connection</h2>
+    <h2>Wallet & Network Configuration</h2>
     <button id="connectWalletButton">Connect Wallet</button>
     <p><strong>Connected Address:</strong> <span id="walletAddress">Not connected</span></p>
-  </div>
-  
-  <!-- Contract Configuration -->
-  <div class="section">
-    <h2>Contract Configuration</h2>
-    <label for="contractAddress">TPY Staking Contract Address:</label>
-    <input type="text" id="contractAddress" value="0xYourContractAddress" />
+    
+    <label for="networkSelect">Select Network:</label>
+    <select id="networkSelect">
+      <option value="sepolia">Sepolia</option>
+      <option value="mainnet">Mainnet</option>
+      <option value="goerli">Goerli</option>
+      <option value="rinkeby">Rinkeby</option>
+    </select>
+    
+    <label for="rpcEndpoint">RPC Endpoint:</label>
+    <input type="text" id="rpcEndpoint" value="https://rpc.sepolia.org" />
+    
+    <label for="contractAddress">Contract Address:</label>
+    <input type="text" id="contractAddress" value="0xBbB449a875bAD0bc422758F0E08e86202E500eD3" />
   </div>
   
   <!-- Write Functions Section -->
   <div class="section">
     <h2>Write Functions</h2>
-    
     <!-- Stake Section -->
     <h3>Stake Tokens</h3>
     <label for="stakePoolId">Pool ID:</label>
@@ -202,14 +208,29 @@
       "function userReferrer(address) view returns (address)"
     ];
     
-    // Connect wallet and instantiate contract with signer
+    // Connect wallet and instantiate contract with signer using the selected RPC endpoint
     async function connectWallet() {
       if (window.ethereum) {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
         signer = provider.getSigner();
-        document.getElementById('walletAddress').innerText = await signer.getAddress();
+        const userAddress = await signer.getAddress();
+        document.getElementById('walletAddress').innerText = userAddress;
+        
+        // Get the RPC endpoint and contract address from the UI
+        const rpcEndpoint = document.getElementById('rpcEndpoint').value.trim();
         const contractAddress = document.getElementById('contractAddress').value.trim();
+        
+        // (Optional) Check the network selected versus the wallet's current network
+        const networkSelect = document.getElementById('networkSelect').value;
+        provider.getNetwork().then(net => {
+          // For Sepolia, chainId should be 11155111.
+          if (networkSelect === "sepolia" && net.chainId !== 11155111) {
+            console.warn("Warning: Wallet is not connected to Sepolia");
+          }
+        });
+        
+        // Instantiate the contract with the signer for write calls
         contract = new ethers.Contract(contractAddress, tpyStakingABI, signer);
       } else {
         alert("Please install a Web3 wallet like MetaMask.");
@@ -348,7 +369,6 @@
       const poolId = document.getElementById('poolIdRead').value;
       try {
         const info = await contract.poolInfo(poolId);
-        // info is a tuple with keys: isPaused, lockPeriod, apy, totalStakes, pauseCheckpoint.
         document.getElementById('readPoolInfoResult').innerText = "Pool Info:\n" + JSON.stringify(info, null, 2);
       } catch (error) {
         document.getElementById('readPoolInfoResult').innerText = "Error: " + error.message;
