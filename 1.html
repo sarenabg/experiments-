@@ -6,11 +6,12 @@
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; }
-    input, button, textarea, select { padding: 0.5rem; margin: 0.5rem 0; width: 100%; max-width: 400px; }
+    input, button, textarea { padding: 0.5rem; margin: 0.5rem 0; width: 100%; max-width: 400px; }
     .section { border: 1px solid #ddd; padding: 1rem; margin-bottom: 2rem; }
     .result { margin-top: 1rem; }
     label { display: block; margin-top: 1rem; }
     pre { background: #f8f8f8; padding: 0.5rem; }
+    /* Added styling for available pools and admin section */
     .admin-section { background-color: #fff8f8; }
     .pool-grid {
       display: grid;
@@ -41,9 +42,8 @@
   </style>
 </head>
 <body>
-  <h1>TPY Staking DApp</h1>
-  
   <!-- New Available Pools Section -->
+  <h1>TPY Staking DApp</h1>
   <div class="section">
     <h2>Available Pools</h2>
     <button id="refreshPoolsButton" class="refresh-button">Refresh Pools</button>
@@ -52,31 +52,16 @@
     </div>
   </div>
   
-  <!-- Wallet & Network Configuration -->
+  <!-- Wallet Connection -->
   <div class="section">
-    <h2>Wallet & Network Configuration</h2>
+    <h2>Wallet Connection</h2>
     <button id="connectWalletButton">Connect Wallet</button>
     <p><strong>Connected Address:</strong> <span id="walletAddress">Not connected</span></p>
-    
-    <label for="networkSelect">Select Network:</label>
-    <select id="networkSelect">
-      <option value="sepolia">Sepolia</option>
-      <option value="mainnet">Mainnet</option>
-      <option value="goerli">Goerli</option>
-      <option value="rinkeby">Rinkeby</option>
-    </select>
-    
-    <label for="rpcEndpoint">RPC Endpoint:</label>
-    <input type="text" id="rpcEndpoint" value="https://rpc.sepolia.org" />
-    
-    <label for="contractAddress">Contract Address:</label>
-    <input type="text" id="contractAddress" value="0xBbB449a875bAD0bc422758F0E08e86202E500eD3" />
   </div>
   
   <!-- Write Functions Section -->
   <div class="section">
     <h2>Write Functions</h2>
-    
     <!-- Stake Section -->
     <h3>Stake Tokens</h3>
     <label for="stakePoolId">Pool ID:</label>
@@ -115,82 +100,6 @@
     <div class="result">
       <pre id="emergencyResult">-</pre>
     </div>
-    
-    <!-- Admin Functions (wrapped in admin-section) -->
-    <div class="section admin-section">
-      <h3>Admin Functions</h3>
-      <!-- Add Pool -->
-      <h4>Add Pool</h4>
-      <label for="addPoolApy">APY:</label>
-      <input type="number" id="addPoolApy" value="1000" />
-      
-      <label for="addPoolLockPeriod">Lock Period (seconds):</label>
-      <input type="number" id="addPoolLockPeriod" value="2592000" />
-      
-      <button id="addPoolButton">Add Pool</button>
-      <div class="result">
-        <pre id="addPoolResult">-</pre>
-      </div>
-      
-      <!-- Change Pool -->
-      <h4>Change Pool</h4>
-      <label for="changePoolId">Pool ID:</label>
-      <input type="number" id="changePoolId" value="0" />
-      
-      <label for="changePoolApy">New APY:</label>
-      <input type="number" id="changePoolApy" value="1000" />
-      
-      <label for="changePoolLockPeriod">New Lock Period (seconds):</label>
-      <input type="number" id="changePoolLockPeriod" value="2592000" />
-      
-      <button id="changePoolButton">Change Pool</button>
-      <div class="result">
-        <pre id="changePoolResult">-</pre>
-      </div>
-      
-      <!-- Pause Pool -->
-      <h4>Pause Pool</h4>
-      <label for="pausePoolId">Pool ID:</label>
-      <input type="number" id="pausePoolId" value="0" />
-      
-      <button id="pausePoolButton">Pause Pool</button>
-      <div class="result">
-        <pre id="pausePoolResult">-</pre>
-      </div>
-      
-      <!-- Set Referrer Reward -->
-      <h4>Set Referrer Reward</h4>
-      <label for="setReward">New Referrer Reward (%):</label>
-      <input type="number" id="setReward" value="20" />
-      
-      <button id="setRewardButton">Set Referrer Reward</button>
-      <div class="result">
-        <pre id="setRewardResult">-</pre>
-      </div>
-      
-      <!-- Set Treasury Address -->
-      <h4>Set Treasury Address</h4>
-      <label for="setTreasuryAddress">New Treasury Address:</label>
-      <input type="text" id="setTreasuryAddress" placeholder="0x..." />
-      
-      <button id="setTreasuryButton">Set Treasury</button>
-      <div class="result">
-        <pre id="setTreasuryResult">-</pre>
-      </div>
-      
-      <!-- Rescue Tokens -->
-      <h4>Rescue Tokens</h4>
-      <label for="rescueToken">Token Address:</label>
-      <input type="text" id="rescueToken" placeholder="0x..." />
-      
-      <label for="rescueAmount">Amount:</label>
-      <input type="text" id="rescueAmount" placeholder="Amount in smallest unit" />
-      
-      <button id="rescueTokensButton">Rescue Tokens</button>
-      <div class="result">
-        <pre id="rescueTokensResult">-</pre>
-      </div>
-    </div>
   </div>
   
   <!-- Read Functions Section -->
@@ -227,21 +136,17 @@
   </div>
   
   <script>
-    // Global variables
+    // Fixed contract configuration
+    const CONTRACT_ADDRESS = "0xBbB449a875bAD0bc422758F0E08e86202E500eD3";
+    const RPC_ENDPOINT = "https://rpc.sepolia.org";
+    
     let signer;
     let contract;
-    
-    // Combined ABI including new functions
+    // Combined ABI (including poolLength and hasRole for added functionality)
     const tpyStakingABI = [
       "function stake(uint256 pid_, uint256 amount_, uint256 referrerId_) external",
       "function unstake(uint256 pid_, uint256 amount_) external",
       "function emergencyUnstake(uint256 pid_) external",
-      "function addPool(uint256 apy_, uint256 lockPeriod_) external",
-      "function changePool(uint256 pid_, uint256 newApy_, uint256 newLockPeriod_) external",
-      "function pausePool(uint256 pid_) external",
-      "function setReferrerReward(uint256 newReferrerReward_) external",
-      "function setTreasuryAddress(address newTreasury_) external",
-      "function inCaseTokensGetStuck(address token_, uint256 amount_) external",
       "function totalStakes() view returns (uint256)",
       "function poolInfo(uint256) view returns (bool isPaused, uint256 lockPeriod, uint256 apy, uint256 totalStakes, uint256 pauseCheckpoint)",
       "function stakeOfAuto(uint256, address) view returns (uint256)",
@@ -250,7 +155,7 @@
       "function hasRole(bytes32, address) view returns (bool)"
     ];
     
-    // Formatting helper functions
+    // Helper functions for formatting
     function formatDuration(seconds) {
       const days = Math.floor(seconds / 86400);
       const hours = Math.floor((seconds % 86400) / 3600);
@@ -270,15 +175,24 @@
       return ethers.utils.formatEther(amount);
     }
     
-    // Refresh pool list function
+    // Function to refresh the Available Pools list
     async function refreshPools() {
       if (!contract) {
         document.getElementById('poolList').innerHTML = '<p>Please connect your wallet first</p>';
         return;
       }
       try {
-        let poolCount = await contract.poolLength();
-        poolCount = poolCount.toNumber();
+        // Use a loop to determine pool count if poolLength() is not available
+        let poolCount = 0;
+        while (true) {
+          try {
+            await contract.poolInfo(poolCount);
+            poolCount++;
+          } catch (error) {
+            break;
+          }
+        }
+        
         let poolsHtml = '';
         for (let i = 0; i < poolCount; i++) {
           const pool = await contract.poolInfo(i);
@@ -300,7 +214,7 @@
       }
     }
     
-    // Updated connectWallet function (merging both versions)
+    // Connect wallet and instantiate contract; also refresh available pools afterward
     async function connectWallet() {
       if (window.ethereum) {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -309,24 +223,20 @@
         const userAddress = await signer.getAddress();
         document.getElementById('walletAddress').innerText = userAddress;
         
-        // Use values from the UI for RPC endpoint and contract address
-        const rpcEndpoint = document.getElementById('rpcEndpoint').value.trim();
-        const contractAddress = document.getElementById('contractAddress').value.trim();
-        
-        // Check that the wallet is on Sepolia (chainId 11155111)
+        // Check network is Sepolia (chainId 11155111)
         const network = await provider.getNetwork();
         if (network.chainId !== 11155111) {
           alert("Please switch to Sepolia network");
           return;
         }
         
-        // Instantiate the contract with the signer
-        contract = new ethers.Contract(contractAddress, tpyStakingABI, signer);
+        // Instantiate the contract
+        contract = new ethers.Contract(CONTRACT_ADDRESS, tpyStakingABI, signer);
         
-        // Refresh pool list after connecting
+        // Refresh the available pools list after connecting
         await refreshPools();
         
-        // Check if user is admin and show/hide admin section
+        // Check admin role (if an admin section exists) and show/hide accordingly
         const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000';
         try {
           const isAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, userAddress);
@@ -335,14 +245,14 @@
             adminSection.style.display = isAdmin ? 'block' : 'none';
           }
         } catch (err) {
-          console.error("Admin role check error", err);
+          console.error("Admin role check error:", err);
         }
       } else {
         alert("Please install a Web3 wallet like MetaMask.");
       }
     }
     
-    // Event listeners for wallet and pool refresh
+    // Event listeners for wallet connection and pool refresh
     document.getElementById('connectWalletButton').addEventListener('click', connectWallet);
     document.getElementById('refreshPoolsButton').addEventListener('click', refreshPools);
     
@@ -383,82 +293,6 @@
         document.getElementById('emergencyResult').innerText = "Emergency unstake successful: " + tx.hash;
       } catch (error) {
         document.getElementById('emergencyResult').innerText = "Error: " + error.message;
-      }
-    });
-    
-    document.getElementById('addPoolButton').addEventListener('click', async () => {
-      const apy = document.getElementById('addPoolApy').value;
-      const lockPeriod = document.getElementById('addPoolLockPeriod').value;
-      try {
-        const tx = await contract.addPool(apy, lockPeriod);
-        document.getElementById('addPoolResult').innerText = "Transaction sent: " + tx.hash;
-        await tx.wait();
-        document.getElementById('addPoolResult').innerText = "Pool added: " + tx.hash;
-      } catch (error) {
-        document.getElementById('addPoolResult').innerText = "Error: " + error.message;
-      }
-    });
-    
-    document.getElementById('changePoolButton').addEventListener('click', async () => {
-      const poolId = document.getElementById('changePoolId').value;
-      const newApy = document.getElementById('changePoolApy').value;
-      const newLockPeriod = document.getElementById('changePoolLockPeriod').value;
-      try {
-        const tx = await contract.changePool(poolId, newApy, newLockPeriod);
-        document.getElementById('changePoolResult').innerText = "Transaction sent: " + tx.hash;
-        await tx.wait();
-        document.getElementById('changePoolResult').innerText = "Pool changed: " + tx.hash;
-      } catch (error) {
-        document.getElementById('changePoolResult').innerText = "Error: " + error.message;
-      }
-    });
-    
-    document.getElementById('pausePoolButton').addEventListener('click', async () => {
-      const poolId = document.getElementById('pausePoolId').value;
-      try {
-        const tx = await contract.pausePool(poolId);
-        document.getElementById('pausePoolResult').innerText = "Transaction sent: " + tx.hash;
-        await tx.wait();
-        document.getElementById('pausePoolResult').innerText = "Pool paused: " + tx.hash;
-      } catch (error) {
-        document.getElementById('pausePoolResult').innerText = "Error: " + error.message;
-      }
-    });
-    
-    document.getElementById('setRewardButton').addEventListener('click', async () => {
-      const reward = document.getElementById('setReward').value;
-      try {
-        const tx = await contract.setReferrerReward(reward);
-        document.getElementById('setRewardResult').innerText = "Transaction sent: " + tx.hash;
-        await tx.wait();
-        document.getElementById('setRewardResult').innerText = "Referrer reward set: " + tx.hash;
-      } catch (error) {
-        document.getElementById('setRewardResult').innerText = "Error: " + error.message;
-      }
-    });
-    
-    document.getElementById('setTreasuryButton').addEventListener('click', async () => {
-      const newTreasury = document.getElementById('setTreasuryAddress').value;
-      try {
-        const tx = await contract.setTreasuryAddress(newTreasury);
-        document.getElementById('setTreasuryResult').innerText = "Transaction sent: " + tx.hash;
-        await tx.wait();
-        document.getElementById('setTreasuryResult').innerText = "Treasury set: " + tx.hash;
-      } catch (error) {
-        document.getElementById('setTreasuryResult').innerText = "Error: " + error.message;
-      }
-    });
-    
-    document.getElementById('rescueTokensButton').addEventListener('click', async () => {
-      const tokenAddress = document.getElementById('rescueToken').value;
-      const amount = document.getElementById('rescueAmount').value;
-      try {
-        const tx = await contract.inCaseTokensGetStuck(tokenAddress, amount);
-        document.getElementById('rescueTokensResult').innerText = "Transaction sent: " + tx.hash;
-        await tx.wait();
-        document.getElementById('rescueTokensResult').innerText = "Tokens rescued: " + tx.hash;
-      } catch (error) {
-        document.getElementById('rescueTokensResult').innerText = "Error: " + error.message;
       }
     });
     
