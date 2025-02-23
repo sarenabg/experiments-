@@ -107,14 +107,15 @@
       return ethers.utils.formatEther(amount);
     }
     
-    // Create a read-only provider and contract instance based on selected network
+    // Create a read-only contract instance based on selected network
     function getPublicContract() {
       const networkChoice = document.getElementById('networkSelect').value;
       const selectedNetwork = NETWORKS[networkChoice];
       const publicProvider = new ethers.providers.JsonRpcProvider(selectedNetwork.rpc);
       return new ethers.Contract(CONTRACT_ADDRESS, [
         "function poolInfo(uint256) view returns (bool isPaused, uint256 lockPeriod, uint256 apy, uint256 totalStakes, uint256 pauseCheckpoint)",
-        "function poolLength() view returns (uint256)"
+        "function poolLength() view returns (uint256)",
+        "function stakeOfAuto(uint256, address) view returns (uint256)"
       ], publicProvider);
     }
     
@@ -150,6 +151,7 @@
                   <p><strong>APY:</strong> ${formatAPY(pool.apy)}</p>
                   <p><strong>Lock Period:</strong> ${formatDuration(pool.lockPeriod.toNumber())}</p>
                   <p><strong>Total Staked:</strong> ${formatTokens(pool.totalStakes)} TPY</p>
+                  <p class="userStake">Your Stake: --</p>
                   ${pool.isPaused ? `<p><strong>Paused At:</strong> ${new Date(pool.pauseCheckpoint.toNumber() * 1000).toLocaleString()}</p>` : ''}
                 </div>
                 <div class="pool-actions">
@@ -167,6 +169,7 @@
         }
         document.getElementById('poolList').innerHTML = poolsHtml || '<p>No pools available</p>';
         attachPoolActionListeners();
+        updateUserStakes();
       } catch (error) {
         console.error('Error fetching pools:', error);
         document.getElementById('poolList').innerHTML = '<p>Error loading pools: ' + error.message + '</p>';
@@ -191,6 +194,7 @@
             resultDiv.innerText = "Transaction sent: " + tx.hash;
             await tx.wait();
             resultDiv.innerText = "Stake successful: " + tx.hash;
+            updateUserStakes(); // Update your stake after staking
           } catch (error) {
             resultDiv.innerText = "Error: " + error.message;
           }
@@ -211,10 +215,28 @@
             resultDiv.innerText = "Transaction sent: " + tx.hash;
             await tx.wait();
             resultDiv.innerText = "Unstake successful: " + tx.hash;
+            updateUserStakes(); // Update your stake after unstaking
           } catch (error) {
             resultDiv.innerText = "Error: " + error.message;
           }
         });
+      });
+    }
+    
+    // Update "Your Stake" info for each pool if the wallet is connected.
+    async function updateUserStakes() {
+      if (!contract) return; // Wallet not connected
+      const userAddress = await signer.getAddress();
+      document.querySelectorAll('.pool-card').forEach(async card => {
+        const poolId = card.getAttribute('data-poolid');
+        try {
+          // Use the write contract (with signer) to fetch user stake
+          const stake = await contract.stakeOfAuto(poolId, userAddress);
+          card.querySelector('.userStake').innerText = "Your Stake: " + formatTokens(stake) + " TPY";
+        } catch (error) {
+          console.error("Error fetching stake for pool " + poolId, error);
+          card.querySelector('.userStake').innerText = "Your Stake: Error";
+        }
       });
     }
     
@@ -235,6 +257,7 @@
           return;
         }
         contract = new ethers.Contract(CONTRACT_ADDRESS, tpyStakingABI, signer);
+        updateUserStakes(); // Update stake info immediately after connecting.
       } else {
         alert("Please install a Web3 wallet like MetaMask.");
       }
