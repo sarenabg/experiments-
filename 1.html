@@ -6,12 +6,13 @@
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; }
-    input, button, textarea { padding: 0.5rem; margin: 0.5rem 0; }
+    input, button, textarea { padding: 0.5rem; margin: 0.5rem 0; width: 100%; max-width: 400px; }
     .section { border: 1px solid #ddd; padding: 1rem; margin-bottom: 2rem; }
     .result { margin-top: 1rem; }
     label { display: block; margin-top: 1rem; }
     pre { background: #f8f8f8; padding: 0.5rem; }
-    /* Pool list styling */
+    /* Styling for available pools and admin section */
+    .admin-section { background-color: #fff8f8; }
     .pool-grid { display: block; margin: 1rem 0; }
     .pool-card {
       border: 1px solid #ddd;
@@ -20,14 +21,14 @@
       background: #f8f8f8;
       margin-bottom: 1rem;
       display: flex;
+      flex-direction: row;
       justify-content: space-between;
       align-items: center;
     }
     .pool-card.paused { background: #fff0f0; }
     .pool-info { flex: 1; }
     .pool-actions { flex: 0 0 auto; margin-left: 1rem; }
-    .pool-actions input { width: 120px; margin-right: 0.5rem; }
-    .pool-actions button { margin-right: 0.5rem; }
+    .pool-actions input { width: auto; margin-right: 0.5rem; }
     .refresh-button {
       background: #4CAF50;
       color: white;
@@ -40,13 +41,13 @@
   </style>
 </head>
 <body>
-  <!-- Available Pools Section (read-only) -->
+  <!-- Available Pools Section -->
   <h1>TPY Staking DApp</h1>
   <div class="section">
     <h2>Available Pools</h2>
     <button id="refreshPoolsButton" class="refresh-button">Refresh Pools</button>
     <div id="poolList" class="pool-grid">
-      <!-- Pool cards will be dynamically inserted here -->
+      <!-- Pools will be dynamically inserted here -->
     </div>
   </div>
   
@@ -57,7 +58,67 @@
     <p><strong>Connected Address:</strong> <span id="walletAddress">Not connected</span></p>
   </div>
   
-  <!-- (Optional) Additional Global Write and Read Sections can go here -->
+  <!-- Write Functions Section (Global) -->
+  <div class="section">
+    <h2>Write Functions</h2>
+    <!-- Stake Section -->
+    <h3>Stake Tokens</h3>
+    <label for="stakePoolId">Pool ID:</label>
+    <input type="number" id="stakePoolId" value="0" />
+    <label for="stakeAmount">Amount to Stake:</label>
+    <input type="text" id="stakeAmount" placeholder="Amount in smallest unit" />
+    <label for="referrerId">Referrer ID (optional):</label>
+    <input type="number" id="referrerId" value="0" />
+    <button id="stakeButton">Stake</button>
+    <div class="result">
+      <pre id="stakeResult">-</pre>
+    </div>
+    
+    <!-- Unstake Section -->
+    <h3>Unstake Tokens</h3>
+    <label for="unstakePoolId">Pool ID:</label>
+    <input type="number" id="unstakePoolId" value="0" />
+    <label for="unstakeAmount">Amount to Unstake:</label>
+    <input type="text" id="unstakeAmount" placeholder="Amount in smallest unit" />
+    <button id="unstakeButton">Unstake</button>
+    <div class="result">
+      <pre id="unstakeResult">-</pre>
+    </div>
+    
+    <!-- Emergency Unstake Section -->
+    <h3>Emergency Unstake</h3>
+    <label for="emergencyPoolId">Pool ID:</label>
+    <input type="number" id="emergencyPoolId" value="0" />
+    <button id="emergencyUnstakeButton">Emergency Unstake</button>
+    <div class="result">
+      <pre id="emergencyResult">-</pre>
+    </div>
+  </div>
+  
+  <!-- Read Functions Section -->
+  <div class="section">
+    <h2>Read Contract Data</h2>
+    <button id="readTotalStakesButton">Get Total Stakes</button>
+    <div class="result">
+      <pre id="readTotalStakesResult">-</pre>
+    </div>
+    <label for="poolIdRead">Pool ID for Pool Info:</label>
+    <input type="number" id="poolIdRead" value="0" />
+    <button id="readPoolInfoButton">Get Pool Info</button>
+    <div class="result">
+      <pre id="readPoolInfoResult">-</pre>
+    </div>
+    <label for="stakeInfoPoolId">Pool ID for Your Stake Info:</label>
+    <input type="number" id="stakeInfoPoolId" value="0" />
+    <button id="readUserStakeInfoButton">Get My Stake Info</button>
+    <div class="result">
+      <pre id="readUserStakeInfoResult">-</pre>
+    </div>
+    <button id="readUserReferrerButton">Get My Referrer</button>
+    <div class="result">
+      <pre id="readUserReferrerResult">-</pre>
+    </div>
+  </div>
   
   <script>
     // Fixed contract configuration
@@ -75,7 +136,7 @@
       "function poolLength() view returns (uint256)"
     ], publicProvider);
     
-    // Combined ABI for write functions and additional reads
+    // Combined ABI for write functions and other reads (same as before)
     const tpyStakingABI = [
       "function stake(uint256 pid_, uint256 amount_, uint256 referrerId_) external",
       "function unstake(uint256 pid_, uint256 amount_) external",
@@ -98,11 +159,9 @@
       if (minutes > 0) result.push(`${minutes} minutes`);
       return result.join(', ') || 'less than a minute';
     }
-    
     function formatAPY(apy) {
       return (apy / 100).toFixed(2) + '%';
     }
-    
     function formatTokens(amount) {
       return ethers.utils.formatEther(amount);
     }
@@ -115,7 +174,7 @@
           poolCount = await publicContract.poolLength();
           poolCount = poolCount.toNumber();
         } catch (err) {
-          // Fallback: iterate until an error occurs
+          // Fallback: iterate until an error is thrown
           while (true) {
             try {
               await publicContract.poolInfo(poolCount);
@@ -125,7 +184,6 @@
             }
           }
         }
-        
         let poolsHtml = '';
         for (let i = 0; i < poolCount; i++) {
           try {
@@ -141,11 +199,11 @@
                   ${pool.isPaused ? `<p><strong>Paused At:</strong> ${new Date(pool.pauseCheckpoint.toNumber() * 1000).toLocaleString()}</p>` : ''}
                 </div>
                 <div class="pool-actions">
-                  <input type="text" class="stakeAmount" placeholder="Amount to Stake">
-                  <button class="poolStakeButton">Stake</button>
-                  <input type="text" class="unstakeAmount" placeholder="Amount to Unstake">
-                  <button class="poolUnstakeButton">Unstake</button>
-                  <div class="poolActionResult"></div>
+                  <input type="text" class="stakeAmount" placeholder="Amount to Stake" data-poolid="${i}">
+                  <button class="poolStakeButton" data-poolid="${i}">Stake</button>
+                  <input type="text" class="unstakeAmount" placeholder="Amount to Unstake" data-poolid="${i}">
+                  <button class="poolUnstakeButton" data-poolid="${i}">Unstake</button>
+                  <div class="poolActionResult" data-poolid="${i}"></div>
                 </div>
               </div>
             `;
@@ -165,16 +223,17 @@
     function attachPoolActionListeners() {
       document.querySelectorAll('.poolStakeButton').forEach(button => {
         button.addEventListener('click', async function() {
+          const poolId = this.dataset.poolid;
           const card = this.closest('.pool-card');
-          const poolId = card.getAttribute('data-poolid');
-          const amount = card.querySelector('.stakeAmount').value;
+          const amountInput = card.querySelector('.stakeAmount');
+          const amount = amountInput.value;
           const resultDiv = card.querySelector('.poolActionResult');
           if (!contract) {
             alert('Please connect your wallet first to perform staking.');
             return;
           }
           try {
-            // Here referrerId is set to 0; modify if needed
+            // Here referrerId is set to 0; modify as needed
             const tx = await contract.stake(poolId, amount, 0);
             resultDiv.innerText = "Transaction sent: " + tx.hash;
             await tx.wait();
@@ -186,9 +245,10 @@
       });
       document.querySelectorAll('.poolUnstakeButton').forEach(button => {
         button.addEventListener('click', async function() {
+          const poolId = this.dataset.poolid;
           const card = this.closest('.pool-card');
-          const poolId = card.getAttribute('data-poolid');
-          const amount = card.querySelector('.unstakeAmount').value;
+          const amountInput = card.querySelector('.unstakeAmount');
+          const amount = amountInput.value;
           const resultDiv = card.querySelector('.poolActionResult');
           if (!contract) {
             alert('Please connect your wallet first to perform unstaking.');
@@ -225,11 +285,87 @@
       }
     }
     
-    // Event listeners
+    // Event listeners for wallet connection and pool refresh
     document.getElementById('connectWalletButton').addEventListener('click', connectWallet);
     document.getElementById('refreshPoolsButton').addEventListener('click', refreshPools);
     
-    // Automatically refresh pools on page load
+    // Global write functions (for the separate write section)
+    document.getElementById('stakeButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('stakePoolId').value;
+      const amount = document.getElementById('stakeAmount').value;
+      const referrerId = document.getElementById('referrerId').value;
+      try {
+        const tx = await contract.stake(poolId, amount, referrerId);
+        document.getElementById('stakeResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('stakeResult').innerText = "Stake successful: " + tx.hash;
+      } catch (error) {
+        document.getElementById('stakeResult').innerText = "Error: " + error.message;
+      }
+    });
+    document.getElementById('unstakeButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('unstakePoolId').value;
+      const amount = document.getElementById('unstakeAmount').value;
+      try {
+        const tx = await contract.unstake(poolId, amount);
+        document.getElementById('unstakeResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('unstakeResult').innerText = "Unstake successful: " + tx.hash;
+      } catch (error) {
+        document.getElementById('unstakeResult').innerText = "Error: " + error.message;
+      }
+    });
+    document.getElementById('emergencyUnstakeButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('emergencyPoolId').value;
+      try {
+        const tx = await contract.emergencyUnstake(poolId);
+        document.getElementById('emergencyResult').innerText = "Transaction sent: " + tx.hash;
+        await tx.wait();
+        document.getElementById('emergencyResult').innerText = "Emergency unstake successful: " + tx.hash;
+      } catch (error) {
+        document.getElementById('emergencyResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Read functions
+    document.getElementById('readTotalStakesButton').addEventListener('click', async () => {
+      try {
+        const totalStakes = await contract.totalStakes();
+        document.getElementById('readTotalStakesResult').innerText = "Total Stakes: " + totalStakes.toString();
+      } catch (error) {
+        document.getElementById('readTotalStakesResult').innerText = "Error: " + error.message;
+      }
+    });
+    document.getElementById('readPoolInfoButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('poolIdRead').value;
+      try {
+        const info = await contract.poolInfo(poolId);
+        document.getElementById('readPoolInfoResult').innerText = "Pool Info:\n" + JSON.stringify(info, null, 2);
+      } catch (error) {
+        document.getElementById('readPoolInfoResult').innerText = "Error: " + error.message;
+      }
+    });
+    document.getElementById('readUserStakeInfoButton').addEventListener('click', async () => {
+      const poolId = document.getElementById('stakeInfoPoolId').value;
+      try {
+        const userAddress = await signer.getAddress();
+        const stakeInfo = await contract.stakeOfAuto(poolId, userAddress);
+        document.getElementById('readUserStakeInfoResult').innerText = "Your Stake (including rewards): " + stakeInfo.toString();
+      } catch (error) {
+        document.getElementById('readUserStakeInfoResult').innerText = "Error: " + error.message;
+      }
+    });
+    document.getElementById('readUserReferrerButton').addEventListener('click', async () => {
+      try {
+        const userAddress = await signer.getAddress();
+        const referrer = await contract.userReferrer(userAddress);
+        document.getElementById('readUserReferrerResult').innerText = "Your Referrer: " + referrer;
+      } catch (error) {
+        document.getElementById('readUserReferrerResult').innerText = "Error: " + error.message;
+      }
+    });
+    
+    // Automatically refresh pools on page load (read-only display)
     refreshPools();
   </script>
 </body>
